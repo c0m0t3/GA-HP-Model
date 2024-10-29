@@ -84,7 +84,7 @@ public class HPModel {
         // Zähle die Anzahl der Aminosäuren an jeder Position
         for (AminoAcid acid : aminoAcids.values()) {
             String position = acid.getX() + "," + acid.getY();
-            positionCount.put(position, positionCount.getOrDefault(position, 0) + 1);
+            positionCount.put(position, positionCount.getOrDefault(position, 0) + 1); //?
         }
     
         // Berechne die Anzahl der Überlappungen basierend auf den Paaren
@@ -95,6 +95,12 @@ public class HPModel {
         }
     
         return overlaps;
+    }
+
+    public double calculateFitnessScore() {
+        int energy = calculateEnergy();
+        int overlaps = countOverlaps();
+        return Math.abs(energy) * Math.pow(0.1, overlaps);
     }
 
     public void printGrid() {
@@ -162,11 +168,17 @@ public class HPModel {
     }
 
     public static void main(String[] args) {
-        String sequence = "HPHHPHHP";
-        String moves = "RDURLUD";
+        //String sequence = "HPHHPPPH";
+        //String moves = "ULDLUUR";
+
+        String sequence = "HPHHPPPH";
+        String moves = "ULDDLUR";
+
         HPModel model = new HPModel(sequence, moves);
         System.out.println("Minimale Energie: " + model.calculateEnergy());
         System.out.println("Anzahl der Überlappungen: " + model.countOverlaps());
+        System.out.println("Fitness-Score: " + model.calculateFitnessScore());
+        
     
         model.printGrid();
     }
