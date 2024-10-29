@@ -77,6 +77,26 @@ public class HPModel {
         return energy;
     }
 
+    public int countOverlaps() {
+        Map<String, Integer> positionCount = new HashMap<>();
+        int overlaps = 0;
+    
+        // Zähle die Anzahl der Aminosäuren an jeder Position
+        for (AminoAcid acid : aminoAcids.values()) {
+            String position = acid.getX() + "," + acid.getY();
+            positionCount.put(position, positionCount.getOrDefault(position, 0) + 1);
+        }
+    
+        // Berechne die Anzahl der Überlappungen basierend auf den Paaren
+        for (int count : positionCount.values()) {
+            if (count > 1) {
+                overlaps += (count * (count - 1)) / 2; // Anzahl der Paare bei Überlappung
+            }
+        }
+    
+        return overlaps;
+    }
+
     public void printGrid() {
         // Bestimme die minimalen und maximalen x- und y-Werte
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
@@ -142,10 +162,12 @@ public class HPModel {
     }
 
     public static void main(String[] args) {
-        String sequence = "HPHPPHHPHPPHPHHPPHPH";
-        String moves = "RUULDLULULDDRDLDRRU";
+        String sequence = "HPHHPHHP";
+        String moves = "RDURLUD";
         HPModel model = new HPModel(sequence, moves);
         System.out.println("Minimale Energie: " + model.calculateEnergy());
+        System.out.println("Anzahl der Überlappungen: " + model.countOverlaps());
+    
         model.printGrid();
     }
 }
