@@ -9,8 +9,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 public class GeneticAlgorithm {
-    private static final int POPULATION_SIZE = 100;
-    private static final int GENERATIONS = 1000000;
+    private static final int POPULATION_SIZE = 10000;
+    private static final int GENERATIONS = 100;
     private static final double MUTATION_RATE = 0.01;
     private static final String SEQUENCE = "HPHPPHHPHPPHPHHPPHPH";
     private static final String CSV_FILE = "log.csv";
@@ -41,7 +41,7 @@ public class GeneticAlgorithm {
                     try {
                         future.get();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        System.err.println("Error: " + e.getMessage());
                     }
                 }
 
@@ -63,6 +63,10 @@ public class GeneticAlgorithm {
                         bestSolution.calculateEnergy(),
                         bestSolution.countOverlaps()));
 
+            
+                //clearScreen();
+                //bestSolution.printGrid();
+
                 // Create a new generation of solutions in parallel
                 List<HPModel> newGeneration = new ArrayList<>();
                 futures.clear();
@@ -83,7 +87,7 @@ public class GeneticAlgorithm {
                     try {
                         future.get();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        System.err.println("Error: " + e.getMessage());
                     }
                 }
 
@@ -160,4 +164,18 @@ public class GeneticAlgorithm {
         // Update the model with the new mutated moves
         model.setMoves(new String(moves));
     }
+
+    public static void clearScreen() {
+        try {
+            String os = System.getProperty("os.name");
+            if (os.contains("Windows")) {
+                new ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor();
+            } else {
+                new ProcessBuilder("clear").inheritIO().start().waitFor();
+            }
+        } catch (Exception e) {
+            System.err.println("Error clearing screen: " + e.getMessage());
+        }
+    }
 }
+
