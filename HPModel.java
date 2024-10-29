@@ -2,10 +2,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 class AminoAcid {
-    private int id;
-    private char type;
-    private int x;
-    private int y;
+    private final int id;
+    private final char type;
+    private final int x;
+    private final int y;
 
     public AminoAcid(int id, char type, int x, int y) {
         this.id = id;
@@ -32,9 +32,9 @@ class AminoAcid {
 }
 
 public class HPModel {
-    private String sequence;
+    private final String sequence;
     private String moves;
-    private Map<Integer, AminoAcid> aminoAcids;
+    private final Map<Integer, AminoAcid> aminoAcids;
 
     public HPModel(String sequence, String moves) {
         this.sequence = sequence;
@@ -50,10 +50,10 @@ public class HPModel {
         for (int i = 1; i < sequence.length(); i++) {
             char move = moves.charAt(i - 1);
             switch (move) {
-                case 'R': x++; break;
-                case 'L': x--; break;
-                case 'U': y++; break;
-                case 'D': y--; break;
+                case 'R' -> x++;
+                case 'L' -> x--;
+                case 'U' -> y++;
+                case 'D' -> y--;
             }
             aminoAcids.put(i, new AminoAcid(i, sequence.charAt(i), x, y));
         }
@@ -169,8 +169,8 @@ public class HPModel {
 
         // Drucke das Grid
         for (int i = grid.length - 1; i >= 0; i--) {  // Von oben nach unten drucken
-            for (int j = 0; j < grid[i].length; j++) {
-                System.out.print(grid[i][j] + " ");
+            for (String item : grid[i]) {
+                System.out.print(item + " ");
             }
             System.out.println();
         }
@@ -178,10 +178,10 @@ public class HPModel {
 
     public static void main(String[] args) {
         //String sequence = "HPHHPPPH";
-        //String moves = "ULDLUUR";
+        //String moves = "LDRDLLDDRDLLUULURUR";
 
-        String sequence = "HPHHPPPH";
-        String moves = "ULDDLUR";
+        String sequence = "HPHPPHHPHPPHPHHPPHPH";
+        String moves = "LDRDLLDDRDLLUULURUR";
 
         HPModel model = new HPModel(sequence, moves);
         System.out.println("Minimale Energie: " + model.calculateEnergy());
