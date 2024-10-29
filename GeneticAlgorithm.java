@@ -4,10 +4,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class GeneticAlgorithm {
-    private static final double POPULATION_SIZE = 100;
-    private static final double GENERATIONS = 1000000;
+    private static final int POPULATION_SIZE = 100;
+    private static final int GENERATIONS = 1000000;
     private static final double MUTATION_RATE = 0.01;
     private static final String SEQUENCE = "HPHPPHHPHPPHPHHPPHPH";
     private static final String CSV_FILE = "log.csv";
@@ -21,11 +24,26 @@ public class GeneticAlgorithm {
         try (FileWriter writer = new FileWriter(CSV_FILE)) {
             writer.write("Generation,AverageFitness,BestFitness,BestOverallFitness,HydrophobicContacts,Overlaps\n");
 
+            // Create a thread pool for parallel execution
+            ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
             // Run the genetic algorithm for a specified number of generations
             for (int generation = 0; generation < GENERATIONS; generation++) {
                 System.out.println("Generation " + generation);
-                // Evaluate the fitness of each individual in the population
-                evaluateFitness(population);
+
+                // Evaluate the fitness of each individual in the population in parallel
+                List<Future<?>> futures = new ArrayList<>();
+                for (HPModel model : population) {
+                    futures.add(executor.submit(() -> model.calculateFitnessScore()));
+                }
+                // Wait for all fitness evaluations to complete
+                for (Future<?> future : futures) {
+                    try {
+                        future.get();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
 
                 // Find the best solution in the current generation
                 HPModel bestInGeneration = Collections.max(population, (a, b) -> Double.compare(a.calculateFitnessScore(), b.calculateFitnessScore()));
@@ -35,7 +53,7 @@ public class GeneticAlgorithm {
 
                 // Calculate the average fitness of the current generation
                 double averageFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).average().orElse(0.0);
-                
+
                 // Log the results of the current generation to the CSV file
                 writer.write(String.format("%d,%.2f,%.2f,%.2f,%d,%d\n",
                         generation,
@@ -45,9 +63,43 @@ public class GeneticAlgorithm {
                         bestSolution.calculateEnergy(),
                         bestSolution.countOverlaps()));
 
-                // Create a new generation of solutions
-                population = createNewGeneration(population);
+                // Create a new generation of solutions in parallel
+                List<HPModel> newGeneration = new ArrayList<>();
+                futures.clear();
+                for (int i = 0; i < POPULATION_SIZE; i++) {
+                    final List<HPModel> finalPopulation = population;
+                    futures.add(executor.submit(() -> {
+                        HPModel parent1 = selectParent(finalPopulation);
+                        HPModel parent2 = selectParent(finalPopulation);
+                        HPModel offspring = crossover(parent1, parent2, new Random());
+                        mutate(offspring, new Random());
+                        synchronized (newGeneration) {
+                            newGeneration.add(offspring);
+                        }
+                    }));
+                }
+                // Wait for all new generation creations to complete
+                for (Future<?> future : futures) {
+                    try {
+                        future.get();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                population = newGeneration;
             }
+
+            executor.shutdown();
+        }
+
+        // Print the best solution found
+        if (bestSolution != null) {
+            System.out.println("Best Solution:");
+            System.out.println("Moves: " + bestSolution.getMoves());
+            System.out.println("Fitness Score: " + bestSolution.calculateFitnessScore());
+            System.out.println("Energy: " + bestSolution.calculateEnergy());
+            System.out.println("Overlaps: " + bestSolution.countOverlaps());
         }
     }
 
@@ -70,30 +122,6 @@ public class GeneticAlgorithm {
             moves[i] = possibleMoves[random.nextInt(possibleMoves.length)];
         }
         return new String(moves);
-    }
-
-    // Evaluate the fitness of each individual in the population
-    private static void evaluateFitness(List<HPModel> population) {
-        for (HPModel model : population) {
-            model.calculateFitnessScore();
-        }
-    }
-
-    // Create a new generation of solutions
-    private static List<HPModel> createNewGeneration(List<HPModel> population) {
-        List<HPModel> newGeneration = new ArrayList<>();
-        Random random = new Random();
-
-        // Generate new offspring until the population size is reached
-        while (newGeneration.size() < POPULATION_SIZE) {
-            HPModel parent1 = selectParent(population);
-            HPModel parent2 = selectParent(population);
-            HPModel offspring = crossover(parent1, parent2, random);
-            mutate(offspring, random);
-            newGeneration.add(offspring);
-        }
-
-        return newGeneration;
     }
 
     // Select a random parent from the population
