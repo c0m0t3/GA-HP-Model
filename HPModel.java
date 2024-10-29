@@ -133,9 +133,9 @@ public class HPModel {
         }
 
         // Drucke das Grid
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                System.out.print(grid[i][j]);
+        for (int i = grid.length - 1; i >= 0; i--) {  // Von oben nach unten drucken
+            for (int j = 0; j < grid[i].length; j++) {
+                System.out.print(grid[i][j] + " ");
             }
             System.out.println();
         }
