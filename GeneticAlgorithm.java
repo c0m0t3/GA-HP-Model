@@ -1,0 +1,135 @@
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+
+public class GeneticAlgorithm {
+    private static final double POPULATION_SIZE = 100;
+    private static final double GENERATIONS = 1000000;
+    private static final double MUTATION_RATE = 0.01;
+    private static final String SEQUENCE = "HPHPPHHPHPPHPHHPPHPH";
+    private static final String CSV_FILE = "log.csv";
+
+    public static void main(String[] args) throws IOException {
+        // Initialize the population with random solutions
+        List<HPModel> population = initializePopulation();
+        HPModel bestSolution = null;
+
+        // Create a CSV file to log the results of each generation
+        try (FileWriter writer = new FileWriter(CSV_FILE)) {
+            writer.write("Generation,AverageFitness,BestFitness,BestOverallFitness,HydrophobicContacts,Overlaps\n");
+
+            // Run the genetic algorithm for a specified number of generations
+            for (int generation = 0; generation < GENERATIONS; generation++) {
+                System.out.println("Generation " + generation);
+                // Evaluate the fitness of each individual in the population
+                evaluateFitness(population);
+
+                // Find the best solution in the current generation
+                HPModel bestInGeneration = Collections.max(population, (a, b) -> Double.compare(a.calculateFitnessScore(), b.calculateFitnessScore()));
+                if (bestSolution == null || bestInGeneration.calculateFitnessScore() > bestSolution.calculateFitnessScore()) {
+                    bestSolution = bestInGeneration;
+                }
+
+                // Calculate the average fitness of the current generation
+                double averageFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).average().orElse(0.0);
+                
+                // Log the results of the current generation to the CSV file
+                writer.write(String.format("%d,%.2f,%.2f,%.2f,%d,%d\n",
+                        generation,
+                        averageFitness,
+                        bestInGeneration.calculateFitnessScore(),
+                        bestSolution.calculateFitnessScore(),
+                        bestSolution.calculateEnergy(),
+                        bestSolution.countOverlaps()));
+
+                // Create a new generation of solutions
+                population = createNewGeneration(population);
+            }
+        }
+    }
+
+    // Initialize the population with random moves
+    private static List<HPModel> initializePopulation() {
+        List<HPModel> population = new ArrayList<>();
+        Random random = new Random();
+        for (int i = 0; i < POPULATION_SIZE; i++) {
+            String moves = randomMoves(SEQUENCE.length() - 1, random);
+            population.add(new HPModel(SEQUENCE, moves));
+        }
+        return population;
+    }
+
+    // Generate a random sequence of moves
+    private static String randomMoves(int length, Random random) {
+        char[] moves = new char[length];
+        char[] possibleMoves = {'U', 'D', 'L', 'R'};
+        for (int i = 0; i < length; i++) {
+            moves[i] = possibleMoves[random.nextInt(possibleMoves.length)];
+        }
+        return new String(moves);
+    }
+
+    // Evaluate the fitness of each individual in the population
+    private static void evaluateFitness(List<HPModel> population) {
+        for (HPModel model : population) {
+            model.calculateFitnessScore();
+        }
+    }
+
+    // Create a new generation of solutions
+    private static List<HPModel> createNewGeneration(List<HPModel> population) {
+        List<HPModel> newGeneration = new ArrayList<>();
+        Random random = new Random();
+
+        // Generate new offspring until the population size is reached
+        while (newGeneration.size() < POPULATION_SIZE) {
+            HPModel parent1 = selectParent(population);
+            HPModel parent2 = selectParent(population);
+            HPModel offspring = crossover(parent1, parent2, random);
+            mutate(offspring, random);
+            newGeneration.add(offspring);
+        }
+
+        return newGeneration;
+    }
+
+    // Select a random parent from the population
+    private static HPModel selectParent(List<HPModel> population) {
+        Random random = new Random();
+        return population.get(random.nextInt(population.size()));
+    }
+
+    // Perform crossover between two parents to create a new offspring
+    private static HPModel crossover(HPModel parent1, HPModel parent2, Random random) {
+        String moves1 = parent1.getMoves();
+        String moves2 = parent2.getMoves();
+        char[] newMoves = new char[moves1.length()];
+
+        // Randomly choose moves from either parent1 or parent2
+        for (int i = 0; i < moves1.length(); i++) {
+            newMoves[i] = random.nextBoolean() ? moves1.charAt(i) : moves2.charAt(i);
+        }
+
+        // Return a new HPModel with the combined moves
+        return new HPModel(SEQUENCE, new String(newMoves));
+    }
+
+    // Apply mutation to the model's moves
+    private static void mutate(HPModel model, Random random) {
+        char[] moves = model.getMoves().toCharArray();
+        char[] possibleMoves = {'U', 'D', 'L', 'R'};
+
+        // Randomly change some moves based on the mutation rate
+        for (int i = 0; i < moves.length; i++) {
+            if (random.nextDouble() < MUTATION_RATE) {
+                moves[i] = possibleMoves[random.nextInt(possibleMoves.length)];
+            }
+        }
+
+        // Update the model with the new mutated moves
+        model.setMoves(new String(moves));
+    }
+}

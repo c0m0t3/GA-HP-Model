@@ -103,6 +103,15 @@ public class HPModel {
         return Math.abs(energy) * Math.pow(0.1, overlaps);
     }
 
+    public String getMoves() {
+        return moves;
+    }
+
+    public void setMoves(String moves) {
+        this.moves = moves;
+        calculatePositions();
+    }
+
     public void printGrid() {
         // Bestimme die minimalen und maximalen x- und y-Werte
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
