@@ -18,9 +18,9 @@ import java.util.concurrent.Future;
 import javax.imageio.ImageIO;
 
 public class GeneticAlgorithm {
-    private static final int POPULATION_SIZE = 100;
-    private static final int GENERATIONS = 100;
-    private static final double MUTATION_RATE = 0.01;
+    private static final int POPULATION_SIZE = 200;
+    private static final int GENERATIONS = 1000;
+    private static final double MUTATION_RATE = 0.1;
     private static final String CSV_FILE = "log.csv";
 
     public static void main(String[] args) throws IOException {
@@ -30,14 +30,14 @@ public class GeneticAlgorithm {
 
     private static void testWithBenchmarks() throws IOException {
         String[] benchmarks = {
-            //Examples.SEQ20,
-            //Examples.SEQ24,
-            //Examples.SEQ25,
-            Examples.SEQ36,
+            //Examples.SEQ20, // Best score: 8/9
+            //Examples.SEQ24, // Best score: 6/9
+            Examples.SEQ25, // Best score: 5/8
+            //Examples.SEQ36,
             //Examples.SEQ48,
             //Examples.SEQ50,
             //Examples.SEQ60,
-            //Examples.SEQ64
+            //Examples.SEQ64 // Best score: 25/42
         };
 
         for (String benchmark : benchmarks) {
@@ -117,11 +117,11 @@ public class GeneticAlgorithm {
                     final List<HPModel> finalPopulation = population;
                     futures.add(executor.submit(() -> {
                         HPModel parent1 = selectParent(finalPopulation);
-                        //HPModel parent2 = selectParent(finalPopulation);
-                        //HPModel offspring = crossover(parent1, parent2, new Random());
-                        //mutate(offspring, new Random());
+                        HPModel parent2 = selectParent(finalPopulation);
+                        HPModel offspring = crossover(parent1, parent2, new Random(), SEQUENCE);
+                        mutate(offspring, new Random());
                         synchronized (newGeneration) {
-                            newGeneration.add(parent1);
+                            newGeneration.add(offspring);
                         }
                     }));
                 }
