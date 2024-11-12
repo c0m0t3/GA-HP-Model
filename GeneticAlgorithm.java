@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -17,7 +18,7 @@ import java.util.concurrent.Future;
 import javax.imageio.ImageIO;
 
 public class GeneticAlgorithm {
-    private static final int POPULATION_SIZE = 1000;
+    private static final int POPULATION_SIZE = 100;
     private static final int GENERATIONS = 100;
     private static final double MUTATION_RATE = 0.01;
     private static final String CSV_FILE = "log.csv";
@@ -32,11 +33,11 @@ public class GeneticAlgorithm {
             //Examples.SEQ20,
             //Examples.SEQ24,
             //Examples.SEQ25,
-            //Examples.SEQ36,
+            Examples.SEQ36,
             //Examples.SEQ48,
             //Examples.SEQ50,
             //Examples.SEQ60,
-            Examples.SEQ64
+            //Examples.SEQ64
         };
 
         for (String benchmark : benchmarks) {
@@ -134,7 +135,7 @@ public class GeneticAlgorithm {
                 }
 
                 population = newGeneration;
-                generateImageForBestSolution(bestSolution, generation);
+                
             }
             executor.shutdown();
         }
@@ -145,61 +146,89 @@ public class GeneticAlgorithm {
             System.out.println("Fitness Score: " + bestSolution.calculateFitnessScore());
             System.out.println("Energy: " + bestSolution.calculateEnergy());
             System.out.println("Overlaps: " + bestSolution.countOverlaps());
+
+            generateImageForBestSolution(bestSolution, GENERATIONS);
         }
     }
          
     private static void generateImageForBestSolution(HPModel bestSolution, int generation) {
-        int height = 500;
-        int width = 800;
-    
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g2 = image.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-    
-        g2.setColor(Color.WHITE);
-        g2.fillRect(0, 0, width, height);
-    
-        int cellSize = 20;
-        int offsetX = width / 2;
-        int offsetY = height / 2;
-    
-        // Draw the HP model
-        Map<Integer, AminoAcid> aminoAcids = bestSolution.getAminoAcids();
-        for (int i = 0; i < aminoAcids.size(); i++) {
-            AminoAcid acid = aminoAcids.get(i);
-            int x = offsetX + acid.getX() * cellSize;
-            int y = offsetY - acid.getY() * cellSize; // Invert y-coordinate
-    
-            if (acid.getType() == 'H') {
-                g2.setColor(Color.RED);
-            } else {
-                g2.setColor(Color.BLUE);
-            }
+    int height = 500;
+    int width = 800;
+
+    BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+    Graphics2D g2 = image.createGraphics();
+    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+    g2.setColor(Color.WHITE);
+    g2.fillRect(0, 0, width, height);
+
+    int cellSize = 20;
+    int offsetX = width / 2;
+    int offsetY = height / 2;
+
+    // Draw the HP model
+    Map<Integer, AminoAcid> aminoAcids = bestSolution.getAminoAcids();
+    Map<String, Integer> positionCount = new HashMap<>();
+    for (AminoAcid acid : aminoAcids.values()) {
+        String position = acid.getX() + "," + acid.getY();
+        positionCount.put(position, positionCount.getOrDefault(position, 0) + 1);
+    }
+
+    for (int i = 0; i < aminoAcids.size(); i++) {
+        AminoAcid acid = aminoAcids.get(i);
+        int x = offsetX + acid.getX() * cellSize;
+        int y = offsetY - acid.getY() * cellSize; // Invert y-coordinate
+
+        String position = acid.getX() + "," + acid.getY();
+        if (positionCount.get(position) > 1) {
+            g2.setColor(Color.ORANGE); // Overlapping amino acids
+        } else if (acid.getType() == 'H') {
+            g2.setColor(Color.BLACK); // Hydrophobic
+        } else {
+            g2.setColor(Color.WHITE); // Hydrophilic
             g2.fillOval(x, y, cellSize, cellSize);
-    
-            if (i > 0) {
-                AminoAcid prev = aminoAcids.get(i - 1);
-                int prevX = offsetX + prev.getX() * cellSize;
-                int prevY = offsetY - prev.getY() * cellSize; // Invert y-coordinate
-                g2.setColor(Color.BLACK);
-                g2.drawLine(prevX + cellSize / 2, prevY + cellSize / 2, x + cellSize / 2, y + cellSize / 2);
-            }
+            g2.setColor(Color.BLACK); // Border for hydrophilic
+            g2.drawOval(x, y, cellSize, cellSize);
         }
-    
-        String folder = "ga_images";
-        String filename = "generation_" + generation + ".png";
-        File dir = new File(folder);
-        if (!dir.exists()) {
-            dir.mkdirs();
+
+        if (acid.getType() == 'H' || positionCount.get(position) > 1) {
+            g2.fillOval(x, y, cellSize, cellSize);
         }
-    
-        try {
-            ImageIO.write(image, "png", new File(dir, filename));
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(0);
+
+        // Draw the index of the amino acid
+        g2.setColor(Color.RED);
+        g2.drawString(String.valueOf(acid.getId()), x + cellSize / 2 - 4, y + cellSize / 2 + 4);
+
+        if (i > 0) {
+            AminoAcid prev = aminoAcids.get(i - 1);
+            int prevX = offsetX + prev.getX() * cellSize;
+            int prevY = offsetY - prev.getY() * cellSize; // Invert y-coordinate
+            g2.setColor(Color.RED);
+            g2.drawLine(prevX + cellSize / 2, prevY + cellSize / 2, x + cellSize / 2, y + cellSize / 2);
         }
     }
+
+    // Add text with important information
+    g2.setColor(Color.BLACK);
+    g2.drawString("Generation: " + generation, 10, 20);
+    g2.drawString("Fitness Score: " + bestSolution.calculateFitnessScore(), 10, 40);
+    g2.drawString("Energy: " + bestSolution.calculateEnergy(), 10, 60);
+    g2.drawString("Overlaps: " + bestSolution.countOverlaps(), 10, 80);
+
+    String folder = "ga_images";
+    String filename = "generation_" + generation + ".png";
+    File dir = new File(folder);
+    if (!dir.exists()) {
+        dir.mkdirs();
+    }
+
+    try {
+        ImageIO.write(image, "png", new File(dir, filename));
+    } catch (IOException e) {
+        e.printStackTrace();
+        System.exit(0);
+    }
+}
 
     // Initialize the population with random moves
     private static List<HPModel> initializePopulation(String SEQUENCE) {
