@@ -1,28 +1,71 @@
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import javax.imageio.ImageIO;
 
 public class GeneticAlgorithm {
-    private static final int POPULATION_SIZE = 10000;
+    private static final int POPULATION_SIZE = 1000;
     private static final int GENERATIONS = 100;
     private static final double MUTATION_RATE = 0.01;
-    private static final String SEQUENCE = "HPHPPHHPHPPHPHHPPHPH";
     private static final String CSV_FILE = "log.csv";
 
     public static void main(String[] args) throws IOException {
+        // Test the algorithm with benchmark sequences
+        testWithBenchmarks();
+    }
+
+    private static void testWithBenchmarks() throws IOException {
+        String[] benchmarks = {
+            //Examples.SEQ20,
+            //Examples.SEQ24,
+            //Examples.SEQ25,
+            //Examples.SEQ36,
+            //Examples.SEQ48,
+            //Examples.SEQ50,
+            //Examples.SEQ60,
+            Examples.SEQ64
+        };
+
+        for (String benchmark : benchmarks) {
+            String sequence = convertToHP(benchmark);
+            runGeneticAlgorithm(sequence);
+        }
+    }
+
+    private static String convertToHP(String binarySequence) {
+        StringBuilder hpSequence = new StringBuilder();
+        for (char c : binarySequence.toCharArray()) {
+            if (c == '1') {
+                hpSequence.append('H');
+            } else {
+                hpSequence.append('P');
+            }
+        }
+        return hpSequence.toString();
+    }
+
+    private static void runGeneticAlgorithm(String SEQUENCE) throws IOException {
+    
         // Initialize the population with random solutions
-        List<HPModel> population = initializePopulation();
+        List<HPModel> population = initializePopulation(SEQUENCE);
         HPModel bestSolution = null;
 
         // Create a CSV file to log the results of each generation
         try (FileWriter writer = new FileWriter(CSV_FILE)) {
-            writer.write("Generation,AverageFitness,BestFitness,BestOverallFitness,HydrophobicContacts,Overlaps\n");
+            writer.write("Generation;AverageFitness;BestFitness;BestOverallFitness;HydrophobicContacts;Overlaps\n");
 
             // Create a thread pool for parallel execution
             ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
@@ -53,9 +96,8 @@ public class GeneticAlgorithm {
 
                 // Calculate the average fitness of the current generation
                 double averageFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).average().orElse(0.0);
-
                 // Log the results of the current generation to the CSV file
-                writer.write(String.format("%d,%.2f,%.2f,%.2f,%d,%d\n",
+                writer.write(String.format(Locale.GERMAN, "%d;%.2f;%.2f;%.2f;%d;%d\n",
                         generation,
                         averageFitness,
                         bestInGeneration.calculateFitnessScore(),
@@ -74,11 +116,11 @@ public class GeneticAlgorithm {
                     final List<HPModel> finalPopulation = population;
                     futures.add(executor.submit(() -> {
                         HPModel parent1 = selectParent(finalPopulation);
-                        HPModel parent2 = selectParent(finalPopulation);
-                        HPModel offspring = crossover(parent1, parent2, new Random());
-                        mutate(offspring, new Random());
+                        //HPModel parent2 = selectParent(finalPopulation);
+                        //HPModel offspring = crossover(parent1, parent2, new Random());
+                        //mutate(offspring, new Random());
                         synchronized (newGeneration) {
-                            newGeneration.add(offspring);
+                            newGeneration.add(parent1);
                         }
                     }));
                 }
@@ -92,11 +134,10 @@ public class GeneticAlgorithm {
                 }
 
                 population = newGeneration;
+                generateImageForBestSolution(bestSolution, generation);
             }
-
             executor.shutdown();
         }
-
         // Print the best solution found
         if (bestSolution != null) {
             System.out.println("Best Solution:");
@@ -106,9 +147,62 @@ public class GeneticAlgorithm {
             System.out.println("Overlaps: " + bestSolution.countOverlaps());
         }
     }
+         
+    private static void generateImageForBestSolution(HPModel bestSolution, int generation) {
+        int height = 500;
+        int width = 800;
+    
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2 = image.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    
+        g2.setColor(Color.WHITE);
+        g2.fillRect(0, 0, width, height);
+    
+        int cellSize = 20;
+        int offsetX = width / 2;
+        int offsetY = height / 2;
+    
+        // Draw the HP model
+        Map<Integer, AminoAcid> aminoAcids = bestSolution.getAminoAcids();
+        for (int i = 0; i < aminoAcids.size(); i++) {
+            AminoAcid acid = aminoAcids.get(i);
+            int x = offsetX + acid.getX() * cellSize;
+            int y = offsetY - acid.getY() * cellSize; // Invert y-coordinate
+    
+            if (acid.getType() == 'H') {
+                g2.setColor(Color.RED);
+            } else {
+                g2.setColor(Color.BLUE);
+            }
+            g2.fillOval(x, y, cellSize, cellSize);
+    
+            if (i > 0) {
+                AminoAcid prev = aminoAcids.get(i - 1);
+                int prevX = offsetX + prev.getX() * cellSize;
+                int prevY = offsetY - prev.getY() * cellSize; // Invert y-coordinate
+                g2.setColor(Color.BLACK);
+                g2.drawLine(prevX + cellSize / 2, prevY + cellSize / 2, x + cellSize / 2, y + cellSize / 2);
+            }
+        }
+    
+        String folder = "ga_images";
+        String filename = "generation_" + generation + ".png";
+        File dir = new File(folder);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+    
+        try {
+            ImageIO.write(image, "png", new File(dir, filename));
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
+    }
 
     // Initialize the population with random moves
-    private static List<HPModel> initializePopulation() {
+    private static List<HPModel> initializePopulation(String SEQUENCE) {
         List<HPModel> population = new ArrayList<>();
         Random random = new Random();
         for (int i = 0; i < POPULATION_SIZE; i++) {
@@ -118,24 +212,63 @@ public class GeneticAlgorithm {
         return population;
     }
 
-    // Generate a random sequence of moves
     private static String randomMoves(int length, Random random) {
         char[] moves = new char[length];
         char[] possibleMoves = {'U', 'D', 'L', 'R'};
+        char lastMove = ' '; // Initialer Wert, der keine Richtung darstellt
+    
         for (int i = 0; i < length; i++) {
-            moves[i] = possibleMoves[random.nextInt(possibleMoves.length)];
+            char[] validMoves = getValidMoves(lastMove);
+            moves[i] = validMoves[random.nextInt(validMoves.length)];
+            lastMove = moves[i];
         }
         return new String(moves);
     }
+    
+    private static char[] getValidMoves(char lastMove) {
+        switch (lastMove) {
+            case 'U':
+                return new char[] {'U', 'L', 'R'};
+            case 'D':
+                return new char[] {'D', 'L', 'R'};
+            case 'L':
+                return new char[] {'U', 'D', 'L'};
+            case 'R':
+                return new char[] {'U', 'D', 'R'};
+            default:
+                return new char[] {'U', 'D', 'L', 'R'};
+        }
+    }
 
-    // Select a random parent from the population
     private static HPModel selectParent(List<HPModel> population) {
+        // Berechne die Summe aller Fitness-Scores
+        double totalFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).sum();
+    
+        // Berechne die prozentualen Anteile der Fitness-Scores
+        List<Double> cumulativeProbabilities = new ArrayList<>();
+        double cumulativeSum = 0.0;
+        for (HPModel model : population) {
+            cumulativeSum += model.calculateFitnessScore() / totalFitness;
+            cumulativeProbabilities.add(cumulativeSum);
+        }
+    
+        // Erstelle eine Zufallszahl zwischen 0 und 1
         Random random = new Random();
-        return population.get(random.nextInt(population.size()));
+        double randomValue = random.nextDouble();
+    
+        // Finde den Kandidaten, in dessen Bereich die Zufallszahl fällt
+        for (int i = 0; i < cumulativeProbabilities.size(); i++) {
+            if (randomValue <= cumulativeProbabilities.get(i)) {
+                return population.get(i);
+            }
+        }
+    
+        // Falls keine Auswahl getroffen wurde, gib das letzte Element zurück (sollte nicht passieren)
+        return population.get(population.size() - 1);
     }
 
     // Perform crossover between two parents to create a new offspring
-    private static HPModel crossover(HPModel parent1, HPModel parent2, Random random) {
+    private static HPModel crossover(HPModel parent1, HPModel parent2, Random random, String SEQUENCE) {
         String moves1 = parent1.getMoves();
         String moves2 = parent2.getMoves();
         char[] newMoves = new char[moves1.length()];

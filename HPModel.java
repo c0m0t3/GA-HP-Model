@@ -107,6 +107,10 @@ public class HPModel {
         return moves;
     }
 
+    public Map<Integer, AminoAcid> getAminoAcids() {
+        return aminoAcids;
+    }
+
     public void setMoves(String moves) {
         this.moves = moves;
         calculatePositions();
