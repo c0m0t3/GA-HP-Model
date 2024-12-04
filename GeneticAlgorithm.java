@@ -21,9 +21,9 @@ public class GeneticAlgorithm {
     private static final int POPULATION_SIZE = 200;
     private static final int GENERATIONS = 1000;
     private static final double INITIAL_MUTATION_RATE = 0.1;
-    private static final double MUTATION_RATE_INCREASE = 0.05;
+    private static final double MUTATION_RATE_INCREASE = 0.2;
     private static final double MUTATION_RATE_DECREASE = 0.05;
-    private static final double MAX_MUTATION_RATE = 1.0;
+    private static final double MAX_MUTATION_RATE = 64.0;
     private static final double MIN_MUTATION_RATE = 0.01;
     private static final String CSV_FILE = "log.csv";
     private static final boolean USE_TOURNAMENT_SELECTION = true;
@@ -41,8 +41,8 @@ public class GeneticAlgorithm {
             //Examples.SEQ36, // Best score: 11/14
             //Examples.SEQ48, // Best score: 18/22
             //Examples.SEQ50, // Best score: 14/21
-            //Examples.SEQ60, // Best score: 21/34
-            Examples.SEQ64 // Best score: 28/42
+            Examples.SEQ60, // Best score: 21/34
+            //Examples.SEQ64 // Best score: 28/42
         };
 
         for (String benchmark : benchmarks) {
@@ -116,7 +116,7 @@ public class GeneticAlgorithm {
 
                 // Adjust mutation rate based on fitness improvement
                 if (bestInGeneration.calculateFitnessScore() > previousBestFitness) {
-                    mutationRate = Math.max(mutationRate - MUTATION_RATE_DECREASE, MIN_MUTATION_RATE);
+                    mutationRate = Math.max(mutationRate * 0.1, MIN_MUTATION_RATE);
                 } else {
                     mutationRate = Math.min(mutationRate + MUTATION_RATE_INCREASE, MAX_MUTATION_RATE);
                 }
@@ -364,35 +364,40 @@ public class GeneticAlgorithm {
         return children;
     }
 
-    // Apply mutation to the model's moves
-    private static void mutate(HPModel model, Random random, double mutationrate) {
-        // See if mutationrate is reached
-        if (random.nextDouble() > mutationrate) {
-            return;
-        }
+    private static void mutate(HPModel model, Random random, double mutationRate) {
         char[] moves = model.getMoves().toCharArray();
-
-        // Wähle einen zufälligen Punkt für die Mutation
-        int mutationPoint = random.nextInt(moves.length);
-
-        // Bestimme die gültigen Bewegungen basierend auf der vorherigen Bewegung
+    
+        if (mutationRate >= 1.0) {
+            // Multi-point mutation
+            int numberOfMutations = Math.min((int) (mutationRate), moves.length);
+            for (int i = 0; i < numberOfMutations; i++) {
+                int mutationPoint = random.nextInt(moves.length);
+                applyMutation(moves, mutationPoint, random);
+            }
+        } else {
+            // Single-point mutation
+            if (random.nextDouble() <= mutationRate) {
+                int mutationPoint = random.nextInt(moves.length);
+                applyMutation(moves, mutationPoint, random);
+            }
+        }
+    
+        model.setMoves(new String(moves));
+    }
+    
+    private static void applyMutation(char[] moves, int mutationPoint, Random random) {
         char lastMove = mutationPoint > 0 ? moves[mutationPoint - 1] : ' ';
         char currentMove = moves[mutationPoint];
         char[] validMoves = getValidMoves(lastMove);
-
-        // Entferne den aktuellen Zug aus den gültigen Bewegungen
+    
         List<Character> validMovesList = new ArrayList<>();
         for (char move : validMoves) {
             if (move != currentMove) {
                 validMovesList.add(move);
             }
         }
-
-        // Wähle eine zufällige gültige Bewegung für die Mutation
+    
         moves[mutationPoint] = validMovesList.get(random.nextInt(validMovesList.size()));
-
-        // Update the model with the new mutated moves
-        model.setMoves(new String(moves));
     }
 
     public static void clearScreen() {
