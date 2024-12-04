@@ -39,9 +39,9 @@ public class GeneticAlgorithm {
             //Examples.SEQ24, // Best score: 8/9
             //Examples.SEQ25, // Best score: 7/8
             //Examples.SEQ36, // Best score: 11/14
-            //Examples.SEQ48, // Best score: 20/22
-            //Examples.SEQ50, // Best score: 16/21
-            //Examples.SEQ60, // Best score: 26/34
+            //Examples.SEQ48, // Best score: 18/22
+            //Examples.SEQ50, // Best score: 14/21
+            //Examples.SEQ60, // Best score: 21/34
             Examples.SEQ64 // Best score: 28/42
         };
 
@@ -73,7 +73,7 @@ public class GeneticAlgorithm {
 
         // Create a CSV file to log the results of each generation
         try (FileWriter writer = new FileWriter(CSV_FILE)) {
-            writer.write("Generation;AverageFitness;BestFitness;BestOverallFitness;HydrophobicContacts;Overlaps\n");
+            writer.write("Generation;AverageFitness;BestFitness;BestOverallFitness;HydrophobicContacts;Overlaps;MutationRate\n");
 
             // Create a thread pool for parallel execution
             ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
@@ -105,13 +105,14 @@ public class GeneticAlgorithm {
                 // Calculate the average fitness of the current generation
                 double averageFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).average().orElse(0.0);
                 // Log the results of the current generation to the CSV file
-                writer.write(String.format(Locale.GERMAN, "%d;%.2f;%.2f;%.2f;%d;%d\n",
+                writer.write(String.format(Locale.GERMAN, "%d;%.2f;%.2f;%.2f;%d;%d;%.2f\n",
                         generation,
                         averageFitness,
                         bestInGeneration.calculateFitnessScore(),
                         bestSolution.calculateFitnessScore(),
                         bestSolution.calculateEnergy(),
-                        bestSolution.countOverlaps()));
+                        bestSolution.countOverlaps(),
+                        mutationRate));
 
                 // Adjust mutation rate based on fitness improvement
                 if (bestInGeneration.calculateFitnessScore() > previousBestFitness) {
