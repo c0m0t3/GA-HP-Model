@@ -22,6 +22,7 @@ public class GeneticAlgorithm {
     private static final int GENERATIONS = 1000;
     private static final double MUTATION_RATE = 0.1;
     private static final String CSV_FILE = "log.csv";
+    private static final boolean USE_TOURNAMENT_SELECTION = true;
 
     public static void main(String[] args) throws IOException {
         // Test the algorithm with benchmark sequences
@@ -273,6 +274,13 @@ public class GeneticAlgorithm {
     }
 
     private static HPModel selectParent(List<HPModel> population) {
+        if (USE_TOURNAMENT_SELECTION) {
+            return tournamentSelection(population);
+        } else {
+            return fitnessProportionalSelection(population);
+        }
+    }
+    private static HPModel fitnessProportionalSelection(List<HPModel> population) {
         // Berechne die Summe aller Fitness-Scores
         double totalFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).sum();
     
@@ -297,6 +305,19 @@ public class GeneticAlgorithm {
     
         // Falls keine Auswahl getroffen wurde, gib das letzte Element zurück (sollte nicht passieren)
         return population.get(population.size() - 1);
+    }
+
+    private static HPModel tournamentSelection(List<HPModel> population) {
+        Random random = new Random();
+        int k = 2 + random.nextInt(population.size() - 1); // Wähle zufällig 2 ≤ k ≤ n
+
+        List<HPModel> tournament = new ArrayList<>();
+        for (int i = 0; i < k; i++) {
+            tournament.add(population.get(random.nextInt(population.size())));
+        }
+
+        // Führe ein Turnier zwischen den k Lösungskandidaten durch
+        return Collections.max(tournament, (a, b) -> Double.compare(a.calculateFitnessScore(), b.calculateFitnessScore()));
     }
 
     // Perform crossover between two parents to create a new offspring
@@ -333,22 +354,26 @@ public class GeneticAlgorithm {
 
     // Apply mutation to the model's moves
     private static void mutate(HPModel model, Random random) {
+        // See if mutationrate is reached
+        if (random.nextDouble() > MUTATION_RATE) {
+            return;
+        }
         char[] moves = model.getMoves().toCharArray();
-    
+
         // Wähle einen zufälligen Punkt für die Mutation
         int mutationPoint = random.nextInt(moves.length);
-    
+
         // Bestimme die gültigen Bewegungen basierend auf der vorherigen Bewegung
         char lastMove = mutationPoint > 0 ? moves[mutationPoint - 1] : ' ';
         char[] validMoves = getValidMoves(lastMove);
-    
+
         // Wähle eine zufällige gültige Bewegung für die Mutation
         moves[mutationPoint] = validMoves[random.nextInt(validMoves.length)];
-    
+
         // Update the model with the new mutated moves
         model.setMoves(new String(moves));
     }
-    
+
     public static void clearScreen() {
         try {
             String os = System.getProperty("os.name");
