@@ -20,7 +20,11 @@ import javax.imageio.ImageIO;
 public class GeneticAlgorithm {
     private static final int POPULATION_SIZE = 200;
     private static final int GENERATIONS = 1000;
-    private static final double MUTATION_RATE = 0.1;
+    private static final double INITIAL_MUTATION_RATE = 0.1;
+    private static final double MUTATION_RATE_INCREASE = 0.05;
+    private static final double MUTATION_RATE_DECREASE = 0.05;
+    private static final double MAX_MUTATION_RATE = 1.0;
+    private static final double MIN_MUTATION_RATE = 0.01;
     private static final String CSV_FILE = "log.csv";
     private static final boolean USE_TOURNAMENT_SELECTION = true;
 
@@ -32,13 +36,13 @@ public class GeneticAlgorithm {
     private static void testWithBenchmarks() throws IOException {
         String[] benchmarks = {
             //Examples.SEQ20, // Best score: 9/9
-            //Examples.SEQ24, // Best score: 7/9
+            //Examples.SEQ24, // Best score: 8/9
             //Examples.SEQ25, // Best score: 7/8
-            //Examples.SEQ36, // Best score: 10/14
-            Examples.SEQ48, // Best score: 14/22
-            //Examples.SEQ50, // Best score: 13/21
-            //Examples.SEQ60, // Best score: 17/34
-            //Examples.SEQ64 // Best score: 25/42
+            //Examples.SEQ36, // Best score: 11/14
+            //Examples.SEQ48, // Best score: 20/22
+            //Examples.SEQ50, // Best score: 16/21
+            //Examples.SEQ60, // Best score: 26/34
+            Examples.SEQ64 // Best score: 28/42
         };
 
         for (String benchmark : benchmarks) {
@@ -60,7 +64,9 @@ public class GeneticAlgorithm {
     }
 
     private static void runGeneticAlgorithm(String SEQUENCE) throws IOException {
-    
+        double mutationRate = INITIAL_MUTATION_RATE;
+        double previousBestFitness = Double.NEGATIVE_INFINITY;
+
         // Initialize the population with random solutions
         List<HPModel> population = initializePopulation(SEQUENCE);
         HPModel bestSolution = null;
@@ -107,21 +113,26 @@ public class GeneticAlgorithm {
                         bestSolution.calculateEnergy(),
                         bestSolution.countOverlaps()));
 
-            
-                //clearScreen();
-                //bestSolution.printGrid();
+                // Adjust mutation rate based on fitness improvement
+                if (bestInGeneration.calculateFitnessScore() > previousBestFitness) {
+                    mutationRate = Math.max(mutationRate - MUTATION_RATE_DECREASE, MIN_MUTATION_RATE);
+                } else {
+                    mutationRate = Math.min(mutationRate + MUTATION_RATE_INCREASE, MAX_MUTATION_RATE);
+                }
+                previousBestFitness = bestInGeneration.calculateFitnessScore();
 
                 // Create a new generation of solutions in parallel
                 List<HPModel> newGeneration = new ArrayList<>();
                 futures.clear();
                 for (int i = 0; i < POPULATION_SIZE / 2; i++) { // Da wir zwei Kinder pro Crossover erzeugen, halbieren wir die Schleifenanzahl
                     final List<HPModel> finalPopulation = population;
+                    final double finalMutationRate = mutationRate;
                     futures.add(executor.submit(() -> {
                         HPModel parent1 = selectParent(finalPopulation);
                         HPModel parent2 = selectParent(finalPopulation);
                         List<HPModel> offspringList = crossover(parent1, parent2, new Random(), SEQUENCE);
                         for (HPModel offspring : offspringList) {
-                            mutate(offspring, new Random());
+                            mutate(offspring, new Random(), finalMutationRate);
                             synchronized (newGeneration) {
                                 newGeneration.add(offspring);
                             }
@@ -139,7 +150,6 @@ public class GeneticAlgorithm {
                 }
 
                 population = newGeneration;
-                
             }
             executor.shutdown();
         }
@@ -154,85 +164,85 @@ public class GeneticAlgorithm {
             generateImageForBestSolution(bestSolution, GENERATIONS);
         }
     }
-         
+
     private static void generateImageForBestSolution(HPModel bestSolution, int generation) {
-    int height = 500;
-    int width = 800;
+        int height = 500;
+        int width = 800;
 
-    BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-    Graphics2D g2 = image.createGraphics();
-    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2 = image.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-    g2.setColor(Color.WHITE);
-    g2.fillRect(0, 0, width, height);
+        g2.setColor(Color.WHITE);
+        g2.fillRect(0, 0, width, height);
 
-    int cellSize = 20;
-    int offsetX = width / 2;
-    int offsetY = height / 2;
+        int cellSize = 20;
+        int offsetX = width / 2;
+        int offsetY = height / 2;
 
-    // Draw the HP model
-    Map<Integer, AminoAcid> aminoAcids = bestSolution.getAminoAcids();
-    Map<String, Integer> positionCount = new HashMap<>();
-    for (AminoAcid acid : aminoAcids.values()) {
-        String position = acid.getX() + "," + acid.getY();
-        positionCount.put(position, positionCount.getOrDefault(position, 0) + 1);
-    }
-
-    for (int i = 0; i < aminoAcids.size(); i++) {
-        AminoAcid acid = aminoAcids.get(i);
-        int x = offsetX + acid.getX() * cellSize;
-        int y = offsetY - acid.getY() * cellSize; // Invert y-coordinate
-
-        String position = acid.getX() + "," + acid.getY();
-        if (positionCount.get(position) > 1) {
-            g2.setColor(Color.ORANGE); // Overlapping amino acids
-        } else if (acid.getType() == 'H') {
-            g2.setColor(Color.BLACK); // Hydrophobic
-        } else {
-            g2.setColor(Color.WHITE); // Hydrophilic
-            g2.fillOval(x, y, cellSize, cellSize);
-            g2.setColor(Color.BLACK); // Border for hydrophilic
-            g2.drawOval(x, y, cellSize, cellSize);
+        // Draw the HP model
+        Map<Integer, AminoAcid> aminoAcids = bestSolution.getAminoAcids();
+        Map<String, Integer> positionCount = new HashMap<>();
+        for (AminoAcid acid : aminoAcids.values()) {
+            String position = acid.getX() + "," + acid.getY();
+            positionCount.put(position, positionCount.getOrDefault(position, 0) + 1);
         }
 
-        if (acid.getType() == 'H' || positionCount.get(position) > 1) {
-            g2.fillOval(x, y, cellSize, cellSize);
-        }
+        for (int i = 0; i < aminoAcids.size(); i++) {
+            AminoAcid acid = aminoAcids.get(i);
+            int x = offsetX + acid.getX() * cellSize;
+            int y = offsetY - acid.getY() * cellSize; // Invert y-coordinate
 
-        // Draw the index of the amino acid
-        g2.setColor(Color.RED);
-        g2.drawString(String.valueOf(acid.getId()), x + cellSize / 2 - 4, y + cellSize / 2 + 4);
+            String position = acid.getX() + "," + acid.getY();
+            if (positionCount.get(position) > 1) {
+                g2.setColor(Color.ORANGE); // Overlapping amino acids
+            } else if (acid.getType() == 'H') {
+                g2.setColor(Color.BLACK); // Hydrophobic
+            } else {
+                g2.setColor(Color.WHITE); // Hydrophilic
+                g2.fillOval(x, y, cellSize, cellSize);
+                g2.setColor(Color.BLACK); // Border for hydrophilic
+                g2.drawOval(x, y, cellSize, cellSize);
+            }
 
-        if (i > 0) {
-            AminoAcid prev = aminoAcids.get(i - 1);
-            int prevX = offsetX + prev.getX() * cellSize;
-            int prevY = offsetY - prev.getY() * cellSize; // Invert y-coordinate
+            if (acid.getType() == 'H' || positionCount.get(position) > 1) {
+                g2.fillOval(x, y, cellSize, cellSize);
+            }
+
+            // Draw the index of the amino acid
             g2.setColor(Color.RED);
-            g2.drawLine(prevX + cellSize / 2, prevY + cellSize / 2, x + cellSize / 2, y + cellSize / 2);
+            g2.drawString(String.valueOf(acid.getId()), x + cellSize / 2 - 4, y + cellSize / 2 + 4);
+
+            if (i > 0) {
+                AminoAcid prev = aminoAcids.get(i - 1);
+                int prevX = offsetX + prev.getX() * cellSize;
+                int prevY = offsetY - prev.getY() * cellSize; // Invert y-coordinate
+                g2.setColor(Color.RED);
+                g2.drawLine(prevX + cellSize / 2, prevY + cellSize / 2, x + cellSize / 2, y + cellSize / 2);
+            }
+        }
+
+        // Add text with important information
+        g2.setColor(Color.BLACK);
+        g2.drawString("Generation: " + generation, 10, 20);
+        g2.drawString("Fitness Score: " + bestSolution.calculateFitnessScore(), 10, 40);
+        g2.drawString("Energy: " + bestSolution.calculateEnergy(), 10, 60);
+        g2.drawString("Overlaps: " + bestSolution.countOverlaps(), 10, 80);
+
+        String folder = "ga_images";
+        String filename = "generation_" + generation + ".png";
+        File dir = new File(folder);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+
+        try {
+            ImageIO.write(image, "png", new File(dir, filename));
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(0);
         }
     }
-
-    // Add text with important information
-    g2.setColor(Color.BLACK);
-    g2.drawString("Generation: " + generation, 10, 20);
-    g2.drawString("Fitness Score: " + bestSolution.calculateFitnessScore(), 10, 40);
-    g2.drawString("Energy: " + bestSolution.calculateEnergy(), 10, 60);
-    g2.drawString("Overlaps: " + bestSolution.countOverlaps(), 10, 80);
-
-    String folder = "ga_images";
-    String filename = "generation_" + generation + ".png";
-    File dir = new File(folder);
-    if (!dir.exists()) {
-        dir.mkdirs();
-    }
-
-    try {
-        ImageIO.write(image, "png", new File(dir, filename));
-    } catch (IOException e) {
-        e.printStackTrace();
-        System.exit(0);
-    }
-}
 
     // Initialize the population with random moves
     private static List<HPModel> initializePopulation(String SEQUENCE) {
@@ -249,7 +259,7 @@ public class GeneticAlgorithm {
         char[] moves = new char[length];
         char[] possibleMoves = {'U', 'D', 'L', 'R'};
         char lastMove = ' '; // Initialer Wert, der keine Richtung darstellt
-    
+
         for (int i = 0; i < length; i++) {
             char[] validMoves = getValidMoves(lastMove);
             moves[i] = validMoves[random.nextInt(validMoves.length)];
@@ -257,7 +267,7 @@ public class GeneticAlgorithm {
         }
         return new String(moves);
     }
-    
+
     private static char[] getValidMoves(char lastMove) {
         switch (lastMove) {
             case 'U':
@@ -280,10 +290,11 @@ public class GeneticAlgorithm {
             return fitnessProportionalSelection(population);
         }
     }
+
     private static HPModel fitnessProportionalSelection(List<HPModel> population) {
         // Berechne die Summe aller Fitness-Scores
         double totalFitness = population.stream().mapToDouble(HPModel::calculateFitnessScore).sum();
-    
+
         // Berechne die prozentualen Anteile der Fitness-Scores
         List<Double> cumulativeProbabilities = new ArrayList<>();
         double cumulativeSum = 0.0;
@@ -291,18 +302,18 @@ public class GeneticAlgorithm {
             cumulativeSum += model.calculateFitnessScore() / totalFitness;
             cumulativeProbabilities.add(cumulativeSum);
         }
-    
+
         // Erstelle eine Zufallszahl zwischen 0 und 1
         Random random = new Random();
         double randomValue = random.nextDouble();
-    
+
         // Finde den Kandidaten, in dessen Bereich die Zufallszahl fällt
         for (int i = 0; i < cumulativeProbabilities.size(); i++) {
             if (randomValue <= cumulativeProbabilities.get(i)) {
                 return population.get(i);
             }
         }
-    
+
         // Falls keine Auswahl getroffen wurde, gib das letzte Element zurück (sollte nicht passieren)
         return population.get(population.size() - 1);
     }
@@ -326,10 +337,10 @@ public class GeneticAlgorithm {
         String moves2 = parent2.getMoves();
         char[] newMoves1 = new char[moves1.length()];
         char[] newMoves2 = new char[moves1.length()];
-    
+
         // Wähle einen zufälligen Punkt für den Crossover
         int crossoverPoint = random.nextInt(moves1.length());
-    
+
         // Kombiniere die Teile der Elternteile, um zwei neue Kinder zu erzeugen
         for (int i = 0; i < moves1.length(); i++) {
             if (i < crossoverPoint) {
@@ -340,11 +351,11 @@ public class GeneticAlgorithm {
                 newMoves2[i] = moves1.charAt(i);
             }
         }
-    
+
         // Erzeuge zwei neue HPModel-Objekte mit den kombinierten Zügen
         HPModel child1 = new HPModel(SEQUENCE, new String(newMoves1));
         HPModel child2 = new HPModel(SEQUENCE, new String(newMoves2));
-    
+
         // Rückgabe der beiden Kinder als Liste
         List<HPModel> children = new ArrayList<>();
         children.add(child1);
@@ -353,9 +364,9 @@ public class GeneticAlgorithm {
     }
 
     // Apply mutation to the model's moves
-    private static void mutate(HPModel model, Random random) {
+    private static void mutate(HPModel model, Random random, double mutationrate) {
         // See if mutationrate is reached
-        if (random.nextDouble() > MUTATION_RATE) {
+        if (random.nextDouble() > mutationrate) {
             return;
         }
         char[] moves = model.getMoves().toCharArray();
@@ -365,10 +376,19 @@ public class GeneticAlgorithm {
 
         // Bestimme die gültigen Bewegungen basierend auf der vorherigen Bewegung
         char lastMove = mutationPoint > 0 ? moves[mutationPoint - 1] : ' ';
+        char currentMove = moves[mutationPoint];
         char[] validMoves = getValidMoves(lastMove);
 
+        // Entferne den aktuellen Zug aus den gültigen Bewegungen
+        List<Character> validMovesList = new ArrayList<>();
+        for (char move : validMoves) {
+            if (move != currentMove) {
+                validMovesList.add(move);
+            }
+        }
+
         // Wähle eine zufällige gültige Bewegung für die Mutation
-        moves[mutationPoint] = validMoves[random.nextInt(validMoves.length)];
+        moves[mutationPoint] = validMovesList.get(random.nextInt(validMovesList.size()));
 
         // Update the model with the new mutated moves
         model.setMoves(new String(moves));
@@ -387,4 +407,3 @@ public class GeneticAlgorithm {
         }
     }
 }
-
