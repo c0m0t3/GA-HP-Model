@@ -30,13 +30,13 @@ public class GeneticAlgorithm {
 
     private static void testWithBenchmarks() throws IOException {
         String[] benchmarks = {
-            //Examples.SEQ20, // Best score: 8/9
-            //Examples.SEQ24, // Best score: 6/9
-            Examples.SEQ25, // Best score: 5/8
-            //Examples.SEQ36,
-            //Examples.SEQ48,
-            //Examples.SEQ50,
-            //Examples.SEQ60,
+            //Examples.SEQ20, // Best score: 9/9
+            //Examples.SEQ24, // Best score: 7/9
+            //Examples.SEQ25, // Best score: 7/8
+            //Examples.SEQ36, // Best score: 10/14
+            Examples.SEQ48, // Best score: 14/22
+            //Examples.SEQ50, // Best score: 13/21
+            //Examples.SEQ60, // Best score: 17/34
             //Examples.SEQ64 // Best score: 25/42
         };
 
@@ -113,18 +113,21 @@ public class GeneticAlgorithm {
                 // Create a new generation of solutions in parallel
                 List<HPModel> newGeneration = new ArrayList<>();
                 futures.clear();
-                for (int i = 0; i < POPULATION_SIZE; i++) {
+                for (int i = 0; i < POPULATION_SIZE / 2; i++) { // Da wir zwei Kinder pro Crossover erzeugen, halbieren wir die Schleifenanzahl
                     final List<HPModel> finalPopulation = population;
                     futures.add(executor.submit(() -> {
                         HPModel parent1 = selectParent(finalPopulation);
                         HPModel parent2 = selectParent(finalPopulation);
-                        HPModel offspring = crossover(parent1, parent2, new Random(), SEQUENCE);
-                        mutate(offspring, new Random());
-                        synchronized (newGeneration) {
-                            newGeneration.add(offspring);
+                        List<HPModel> offspringList = crossover(parent1, parent2, new Random(), SEQUENCE);
+                        for (HPModel offspring : offspringList) {
+                            mutate(offspring, new Random());
+                            synchronized (newGeneration) {
+                                newGeneration.add(offspring);
+                            }
                         }
                     }));
                 }
+
                 // Wait for all new generation creations to complete
                 for (Future<?> future : futures) {
                     try {
@@ -297,36 +300,55 @@ public class GeneticAlgorithm {
     }
 
     // Perform crossover between two parents to create a new offspring
-    private static HPModel crossover(HPModel parent1, HPModel parent2, Random random, String SEQUENCE) {
+    private static List<HPModel> crossover(HPModel parent1, HPModel parent2, Random random, String SEQUENCE) {
         String moves1 = parent1.getMoves();
         String moves2 = parent2.getMoves();
-        char[] newMoves = new char[moves1.length()];
-
-        // Randomly choose moves from either parent1 or parent2
+        char[] newMoves1 = new char[moves1.length()];
+        char[] newMoves2 = new char[moves1.length()];
+    
+        // Wähle einen zufälligen Punkt für den Crossover
+        int crossoverPoint = random.nextInt(moves1.length());
+    
+        // Kombiniere die Teile der Elternteile, um zwei neue Kinder zu erzeugen
         for (int i = 0; i < moves1.length(); i++) {
-            newMoves[i] = random.nextBoolean() ? moves1.charAt(i) : moves2.charAt(i);
+            if (i < crossoverPoint) {
+                newMoves1[i] = moves1.charAt(i);
+                newMoves2[i] = moves2.charAt(i);
+            } else {
+                newMoves1[i] = moves2.charAt(i);
+                newMoves2[i] = moves1.charAt(i);
+            }
         }
-
-        // Return a new HPModel with the combined moves
-        return new HPModel(SEQUENCE, new String(newMoves));
+    
+        // Erzeuge zwei neue HPModel-Objekte mit den kombinierten Zügen
+        HPModel child1 = new HPModel(SEQUENCE, new String(newMoves1));
+        HPModel child2 = new HPModel(SEQUENCE, new String(newMoves2));
+    
+        // Rückgabe der beiden Kinder als Liste
+        List<HPModel> children = new ArrayList<>();
+        children.add(child1);
+        children.add(child2);
+        return children;
     }
 
     // Apply mutation to the model's moves
     private static void mutate(HPModel model, Random random) {
         char[] moves = model.getMoves().toCharArray();
-        char[] possibleMoves = {'U', 'D', 'L', 'R'};
-
-        // Randomly change some moves based on the mutation rate
-        for (int i = 0; i < moves.length; i++) {
-            if (random.nextDouble() < MUTATION_RATE) {
-                moves[i] = possibleMoves[random.nextInt(possibleMoves.length)];
-            }
-        }
-
+    
+        // Wähle einen zufälligen Punkt für die Mutation
+        int mutationPoint = random.nextInt(moves.length);
+    
+        // Bestimme die gültigen Bewegungen basierend auf der vorherigen Bewegung
+        char lastMove = mutationPoint > 0 ? moves[mutationPoint - 1] : ' ';
+        char[] validMoves = getValidMoves(lastMove);
+    
+        // Wähle eine zufällige gültige Bewegung für die Mutation
+        moves[mutationPoint] = validMoves[random.nextInt(validMoves.length)];
+    
         // Update the model with the new mutated moves
         model.setMoves(new String(moves));
     }
-
+    
     public static void clearScreen() {
         try {
             String os = System.getProperty("os.name");
