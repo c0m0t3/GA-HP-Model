@@ -21,7 +21,7 @@ public class GeneticAlgorithm {
     private static final int POPULATION_SIZE = 200;
     private static final int GENERATIONS = 1000;
     private static final double INITIAL_MUTATION_RATE = 0.1;
-    private static final double MUTATION_RATE_INCREASE = 0.2;
+    private static final double MUTATION_RATE_INCREASE = 0.1;
     private static final double MUTATION_RATE_DECREASE = 0.05;
     private static final double MAX_MUTATION_RATE = 64.0;
     private static final double MIN_MUTATION_RATE = 0.01;
@@ -41,8 +41,8 @@ public class GeneticAlgorithm {
             //Examples.SEQ36, // Best score: 11/14
             //Examples.SEQ48, // Best score: 18/22
             //Examples.SEQ50, // Best score: 14/21
-            Examples.SEQ60, // Best score: 21/34
-            //Examples.SEQ64 // Best score: 28/42
+            //Examples.SEQ60, // Best score: 29/34
+            Examples.SEQ64 // Best score: 29/42
         };
 
         for (String benchmark : benchmarks) {
@@ -116,7 +116,7 @@ public class GeneticAlgorithm {
 
                 // Adjust mutation rate based on fitness improvement
                 if (bestInGeneration.calculateFitnessScore() > previousBestFitness) {
-                    mutationRate = Math.max(mutationRate * 0.1, MIN_MUTATION_RATE);
+                    mutationRate = Math.max(mutationRate / 2, MIN_MUTATION_RATE);
                 } else {
                     mutationRate = Math.min(mutationRate + MUTATION_RATE_INCREASE, MAX_MUTATION_RATE);
                 }
@@ -365,6 +365,11 @@ public class GeneticAlgorithm {
     }
 
     private static void mutate(HPModel model, Random random, double mutationRate) {
+        // return without mutation if random number is greater than mutation rate
+        if (random.nextDouble() > mutationRate) {
+            return;
+        }
+
         char[] moves = model.getMoves().toCharArray();
     
         if (mutationRate >= 1.0) {
