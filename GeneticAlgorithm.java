@@ -21,7 +21,7 @@ public class GeneticAlgorithm {
     private static final int POPULATION_SIZE = 200;
     private static final int GENERATIONS = 1000;
     private static final double INITIAL_MUTATION_RATE = 0.1;
-    private static final double MUTATION_RATE_INCREASE = 0.1;
+    private static final double MUTATION_RATE_INCREASE = 0.25;
     private static final double MUTATION_RATE_DECREASE = 0.05;
     private static final double MAX_MUTATION_RATE = 64.0;
     private static final double MIN_MUTATION_RATE = 0.01;
@@ -40,9 +40,9 @@ public class GeneticAlgorithm {
             //Examples.SEQ25, // Best score: 7/8
             //Examples.SEQ36, // Best score: 11/14
             //Examples.SEQ48, // Best score: 18/22
-            //Examples.SEQ50, // Best score: 14/21
+            //Examples.SEQ50, // Best score: 18/21
             //Examples.SEQ60, // Best score: 29/34
-            Examples.SEQ64 // Best score: 29/42
+            Examples.SEQ64 // Best score: 32/42
         };
 
         for (String benchmark : benchmarks) {
@@ -321,15 +321,29 @@ public class GeneticAlgorithm {
 
     private static HPModel tournamentSelection(List<HPModel> population) {
         Random random = new Random();
-        int k = 2 + random.nextInt(population.size() - 1); // Wähle zufällig 2 ≤ k ≤ n
+        int k = 20;
+        //k soll zwischen 2 und population.size() liegen
+        //int k = random.nextInt(population.size() - 1) + 2;
 
+        double t = 0.75;
+    
         List<HPModel> tournament = new ArrayList<>();
         for (int i = 0; i < k; i++) {
             tournament.add(population.get(random.nextInt(population.size())));
         }
-
-        // Führe ein Turnier zwischen den k Lösungskandidaten durch
-        return Collections.max(tournament, (a, b) -> Double.compare(a.calculateFitnessScore(), b.calculateFitnessScore()));
+    
+        HPModel bestCandidate = tournament.get(0);
+        for (int i = 1; i < k; i++) {
+            HPModel candidate = tournament.get(i);
+            double r = random.nextDouble();
+            // herausforder und bessere kandidat erstellen und dann abhängig von r entscheiden wer gewinnt
+            if ((candidate.calculateFitnessScore() > bestCandidate.calculateFitnessScore() && r < t) ||
+            (candidate.calculateFitnessScore() < bestCandidate.calculateFitnessScore() && r >= t)) {
+            bestCandidate = candidate;
+        }
+        }
+    
+        return bestCandidate;
     }
 
     // Perform crossover between two parents to create a new offspring
